@@ -11,35 +11,15 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            const reviews = await github.paginate(
-              github.rest.pulls.listReviews,
-              { owner, repo, pull_number: pr.number }
-            );
-
-            const files = await github.paginate(
-              github.rest.pulls.listFiles,
-              { owner, repo, pull_number: pr.number }
-            );
-
-            const commits = await github.paginate(
-              github.rest.pulls.listCommits,
-              { owner, repo, pull_number: pr.number }
-            );
-
-            const approvals = reviews
-              .filter(r => r.state === "APPROVED")
-              .map(r => `- ${r.user.login}`)
-              .join("\n") || "No approvals";
-
-            core.setOutput("reviews", approvals);
+            const { owner, repo } = context.repo;
+            const [reviews, files, commits] = await Promise.all([
+              github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number: pr.number }),
+              github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: pr.number }),
+              github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number: pr.number })
+            ]);
+            core.setOutput("reviews", reviews.filter(r => r.state === "APPROVED").map(r => `- ${r.user.login}`).join("\n") || "No approvals");
             core.setOutput("files", files.map(f => `- ${f.filename}`).join("\n"));
-            core.setOutput(
-              "commits",
-              commits.map(c => `- ${c.sha.substring(0,7)} ${c.commit.message.split("\n")[0]}`).join("\n")
-            );
+            core.setOutput("commits", commits.map(c => `- ${c.sha.substring(0,7)} ${c.commit.message.split("\n")[0]}`).join("\n"));
       - name: Output Change Verification Record
         run: |
           echo "::group::Change Verification Record"
@@ -52,7 +32,6 @@ jobs:
           echo ""
           echo "## Change Description"
           echo "${{ github.event.pull_request.title }}"
-          echo ""
           echo "${{ github.event.pull_request.body }}"
           echo ""
           echo "## Author"
@@ -71,5 +50,5 @@ jobs:
           echo "Workflow log: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo ""
           echo "## Release"
-          echo "${{ github.event.pull_request.head.ref }}"
+          echo "$(git fetch --tags && git describe --tags --abbrev=0)"
           echo "::endgroup::"
