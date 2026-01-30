@@ -1,8 +1,6 @@
 name: Change Verification Record
 on:
   workflow_call:
-permissions:
-  pull-requests: read
 jobs:
   ChangeVerificationRecord:
     runs-on: ubuntu-latest
